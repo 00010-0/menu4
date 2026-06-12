@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRAZY SPOT — Social Club Menu</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;500;800&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        display: ['Unbounded','sans-serif'],
+        body: ['"Space Grotesk"','sans-serif'],
+        mono: ['"JetBrains Mono"','monospace'],
+      },
+      colors: {
+        ink:   '#07050d',
+        mist:  '#f3eefc',
+        dim:   '#8d83a6',
+        lime:  '#b4f63a',
+        mag:   '#ff3ea5',
+        viol:  '#a855f7',
+      }
+    }
+  }
+}
+</script>
+<style>
+  :root { --lime:#b4f63a; --mag:#ff3ea5; --viol:#a855f7; }
+  html,body { background:#07050d; overflow:hidden; height:100%; }
+  ::selection { background:var(--lime); color:#07050d; }
+
+  /* ---------- canvas fondo ---------- */
+  #stage { position:fixed; inset:0; z-index:0; }
+
+  /* ---------- splash ---------- */
+  #splash { transition: opacity 1.2s ease, visibility 1.2s; }
+  #splash.gone { opacity:0; visibility:hidden; pointer-events:none; }
+
+  .splash-letter{
+    display:inline-block; opacity:0;
+    transform: translateY(.6em) rotate(4deg) scale(.85);
+    filter: blur(8px);
+    animation: letterIn .9s cubic-bezier(.2,.9,.25,1.2) forwards;
+  }
+  @keyframes letterIn{
+    to{ opacity:1; transform:none; filter:blur(0); }
+  }
+  .splash-sub{
+    opacity:0; letter-spacing:.55em;
+    animation: subIn 1.4s ease 1.4s forwards;
+  }
+  @keyframes subIn{ to{ opacity:1; letter-spacing:.85em; } }
+
+  .scanline{
+    position:absolute; left:0; right:0; height:30vh; pointer-events:none;
+    background:linear-gradient(to bottom, transparent, rgba(180,246,58,.05), transparent);
+    animation: scan 5s linear infinite;
+  }
+  @keyframes scan{ from{ top:-30vh } to{ top:100vh } }
+
+  /* ---------- menú ---------- */
+  #menu{ opacity:0; transition:opacity .9s ease .2s; }
+  #menu.on{ opacity:1; }
+
+  .item{
+    opacity:0; transform:translateY(14px);
+    transition: opacity .6s ease, transform .6s cubic-bezier(.2,.8,.3,1);
+  }
+  #menu.on .item{ opacity:1; transform:none; }
+
+  .row{
+    display:flex; align-items:baseline; gap:.6rem;
+    padding:.18em .5em .18em .65em;
+    border-left:2px solid transparent;
+    border-radius:.15rem;
+    transition: background .6s ease, border-color .6s ease;
+  }
+  .row .leader{
+    flex:1; border-bottom:1px dotted rgba(141,131,166,.4);
+    transform:translateY(-.28em); min-width:1.2rem;
+  }
+  .row.glow{
+    background:linear-gradient(90deg, rgba(180,246,58,.10), transparent 70%);
+    border-left-color:var(--lime);
+  }
+  .row.glow .price{ color:var(--lime); text-shadow:0 0 18px rgba(180,246,58,.55); }
+  .row.glow .name{ color:#fff; }
+
+  .cat-tag{
+    font-family:'Unbounded'; font-weight:800;
+    background:linear-gradient(110deg,#fff 20%, var(--viol) 50%, var(--mag) 80%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    background-size:200% 100%;
+    animation: shine 7s linear infinite;
+  }
+  @keyframes shine{ to{ background-position:200% 0 } }
+
+  .brand-head{
+    color:var(--mag);
+    text-shadow:0 0 14px rgba(255,62,165,.35);
+  }
+
+  .panel{
+    background:linear-gradient(160deg, rgba(168,85,247,.07), rgba(7,5,13,.25) 55%);
+    border:1px solid rgba(168,85,247,.16);
+    backdrop-filter: blur(3px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+  }
+
+  .pulse-dot{ animation:pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{opacity:.35; transform:scale(.85)} 50%{opacity:1; transform:scale(1.15)} }
+
+  /* anclaje donde aterriza el logo 3D */
+  #logoAnchor{ width:64px; height:64px; }
+
+  @media (prefers-reduced-motion: reduce){
+    .splash-letter,.splash-sub,.scanline,.cat-tag,.pulse-dot{ animation:none !important; opacity:1 !important; transform:none !important; filter:none !important; }
+    .item{ transition:none; }
+  }
+</style>
+</head>
+<body class="font-body text-mist antialiased">
+
+<canvas id="stage"></canvas>
+
+<!-- ============ SPLASH ============ -->
+<div id="splash" class="fixed inset-0 z-20 flex flex-col items-center justify-end pb-[8vh] select-none">
+  <div class="scanline"></div>
+  <h1 id="splashTitle" class="font-display font-extrabold text-[7.5vw] leading-none tracking-tight text-center"></h1>
+  <p class="splash-sub font-body font-light text-[1.15vw] text-dim uppercase mt-[2vh] text-center">Social&nbsp;Club&nbsp;·&nbsp;Barcelona</p>
+</div>
+
+<!-- ============ MENÚ ============ -->
+<main id="menu" class="relative z-10 h-screen flex flex-col px-[2.5vw] py-[2.2vh]">
+
+  <!-- header -->
+  <header class="item flex items-center gap-5 pb-[1.6vh] border-b border-viol/20">
+    <div id="logoAnchor" class="shrink-0"></div>
+    <div class="leading-none">
+      <h1 class="font-display font-extrabold text-[2vw] tracking-tight">CRAZY <span class="text-lime">SPOT</span></h1>
+      <p class="text-dim text-[.8vw] uppercase tracking-[.4em] mt-1">Social Club Menu</p>
+    </div>
+    <div class="ml-auto flex items-center gap-6">
+      <div class="flex items-center gap-2 text-[.8vw] uppercase tracking-widest text-dim">
+        <span class="pulse-dot inline-block w-2 h-2 rounded-full bg-lime"></span> Solo socios
+      </div>
+      <div id="clock" class="font-mono text-[1.4vw] text-mist/90 tabular-nums">--:--</div>
+    </div>
+  </header>
+
+  <!-- grid -->
+  <section class="flex-1 grid grid-cols-3 gap-[1.4vw] pt-[2vh] min-h-0">
+
+    <!-- FLORES -->
+    <div class="item panel rounded-xl p-[1.2vw] flex flex-col min-h-0">
+      <h2 class="cat-tag text-[1.5vw] mb-[1.2vh]">FLORES</h2>
+      <ul id="col-flores" class="flex-1 flex flex-col justify-between text-[1.02vw]"></ul>
+    </div>
+
+    <!-- HASH -->
+    <div class="item panel rounded-xl p-[1.2vw] flex flex-col min-h-0">
+      <h2 class="cat-tag text-[1.5vw] mb-[1.2vh]">HASH</h2>
+      <div id="col-hash" class="flex-1 flex flex-col justify-between text-[.98vw]"></div>
+    </div>
+
+    <!-- EXTRACTOS + BEBIDAS -->
+    <div class="flex flex-col gap-[1.4vw] min-h-0">
+      <div class="item panel rounded-xl p-[1.2vw] flex-1 flex flex-col min-h-0">
+        <h2 class="cat-tag text-[1.5vw] mb-[1.2vh]">EXTRACTOS &amp; MÁS</h2>
+        <ul id="col-extra" class="flex-1 flex flex-col justify-around text-[1.05vw]"></ul>
+      </div>
+      <div class="item panel rounded-xl p-[1.2vw] flex flex-col">
+        <h2 class="cat-tag text-[1.5vw] mb-[1.2vh]">BEBIDAS</h2>
+        <ul id="col-drinks" class="flex flex-col gap-[.7vh] text-[1.05vw]"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- footer -->
+  <footer class="item flex items-center justify-between pt-[1.4vh] text-[.75vw] uppercase tracking-[.35em] text-dim">
+    <span>Asociación privada · prohibida la venta</span>
+    <span class="text-viol/70">consumo responsable · +18</span>
+  </footer>
+</main>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+/* ============================================================
+   DATOS DEL MENÚ
+============================================================ */
+const FLORES = [
+  ['Red Haze','13.50'], ['Event Horizon','18'], ['Zangria','19'],
+  ['Garlic Breath','19'], ['Purple Roses','12.50'], ['Crypto Chronic','18'],
+  ['Soda Pop','15'], ['Pink Guava','18'], ['Sushi','18'],
+  ['Cosmopolis','15'], ['Gas Guzzler','18'], ['Mind Melts','18'],
+];
+const HASH = [
+  ['Most Wanted', [
+    ['Permanent Marker','40'], ['Gelato 33','50'], ['La Kush Cake · Cali Dry','30'],
+  ]],
+  ['Staticroom', [
+    ['Glitter Bomb','60'], ['Megan Fox','60'], ['Pōlen Frozen Sift · Lemon Cherry','40'],
+  ]],
+  ['Sahas Terps', [
+    ['Tropical Juice','60'], ['Banana Runtz','60'],
+  ]],
+  ['One Stop CA', [
+    ['Gusher Mintz','40'], ['Amaretto Mintz','40'], ['FF Static','28'],
+    ['Gmo Static','18'], ['WpFF','100'],
+  ]],
+];
+const EXTRA = [ ['Rosin','150'], ['Edibles','25'], ['Dirty Sprite','30'] ];
+const DRINKS = [ ['Agua','1.50'], ['Cola','2.50'], ['Ice Tea','2.50'], ['Redbull','3.00'] ];
+
+const fmt = p => p.includes('.') ? p+'€' : p+'€';
+const rowHTML = (name, price) => `
+  <div class="row">
+    <span class="name text-mist/90">${name}</span>
+    <span class="leader"></span>
+    <span class="price font-mono font-semibold text-mist transition-colors">${fmt(price)}</span>
+  </div>`;
+
+document.getElementById('col-flores').innerHTML =
+  FLORES.map(([n,p])=>`<li>${rowHTML(n,p)}</li>`).join('');
+
+document.getElementById('col-hash').innerHTML =
+  HASH.map(([brand,items])=>`
+    <div>
+      <h3 class="brand-head font-display font-medium text-[.82vw] uppercase tracking-[.25em] mb-[.5vh]">${brand}</h3>
+      <ul class="flex flex-col gap-[.25vh]">
+        ${items.map(([n,p])=>`<li>${rowHTML(n,p)}</li>`).join('')}
+      </ul>
+    </div>`).join('');
+
+document.getElementById('col-extra').innerHTML =
+  EXTRA.map(([n,p])=>`<li>${rowHTML(n,p)}</li>`).join('');
+document.getElementById('col-drinks').innerHTML =
+  DRINKS.map(([n,p])=>`<li>${rowHTML(n,p)}</li>`).join('');
+
+/* reloj */
+const clock = document.getElementById('clock');
+const tickClock = ()=>{ const d=new Date();
+  clock.textContent = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+tickClock(); setInterval(tickClock, 5000);
+
+/* título splash letra a letra */
+const titleEl = document.getElementById('splashTitle');
+'CRAZY SPOT'.split('').forEach((ch,i)=>{
+  const s=document.createElement('span');
+  s.className='splash-letter';
+  s.style.animationDelay = (0.25 + i*0.07)+'s';
+  if (ch===' ') { s.innerHTML='&nbsp;'; }
+  else { s.textContent=ch; if (i>=6) s.style.color='var(--lime)'; }
+  titleEl.appendChild(s);
+});
+
+/* ============================================================
+   THREE.JS — neblina, partículas y logo
+============================================================ */
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const canvas = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#07050d');
+const camera = new THREE.PerspectiveCamera(45, 1, .1, 100);
+camera.position.set(0, 0, 8);
+
+/* --- neblina: plano fullscreen con shader fbm --- */
+const hazeUniforms = {
+  uTime:{value:0}, uRes:{value:new THREE.Vector2(1,1)},
+  uA:{value:new THREE.Color('#3b1670')},      // violeta profundo
+  uB:{value:new THREE.Color('#0e3b1f')},      // verde humo
+  uC:{value:new THREE.Color('#ff3ea5')},      // brasas magenta
+};
+const haze = new THREE.Mesh(
+  new THREE.PlaneGeometry(2,2),
+  new THREE.ShaderMaterial({
+    uniforms: hazeUniforms, depthWrite:false, depthTest:false,
+    vertexShader:`void main(){ gl_Position = vec4(position.xy,1.,1.); }`,
+    fragmentShader:`
+      uniform float uTime; uniform vec2 uRes;
+      uniform vec3 uA,uB,uC;
+      float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+      float noise(vec2 p){ vec2 i=floor(p),f=fract(p); f*=f*(3.-2.*f);
+        return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),
+                   mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
+      float fbm(vec2 p){ float v=0.,a=.5;
+        for(int i=0;i<5;i++){ v+=a*noise(p); p=p*2.03+vec2(1.7,9.2); a*=.55; } return v; }
+      void main(){
+        vec2 uv = gl_FragCoord.xy/uRes;
+        vec2 p = uv*vec2(uRes.x/uRes.y,1.);
+        float t = uTime*.05;
+        float n1 = fbm(p*1.6 + vec2(t*.7, -t*.4));
+        float n2 = fbm(p*3.2 - vec2(t*.3, t*.6) + n1);
+        vec3 col = vec3(.027,.02,.05);
+        col += uA * smoothstep(.35,.95,n1) * .45;
+        col += uB * smoothstep(.55,1.,n2) * .30;
+        col += uC * pow(smoothstep(.72,1.,n1*n2*1.6),2.) * .35;
+        float vig = smoothstep(1.25,.35,length(uv-.5));
+        gl_FragColor = vec4(col*vig, 1.);
+      }`
+  })
+);
+haze.renderOrder = -1; haze.frustumCulled = false;
+scene.add(haze);
+
+/* --- partículas flotantes --- */
+const PN = reduced ? 0 : 260;
+let pts=null, pVel=[];
+if (PN){
+  const pos = new Float32Array(PN*3);
+  for(let i=0;i<PN;i++){
+    pos[i*3]=(Math.random()-.5)*16; pos[i*3+1]=(Math.random()-.5)*9; pos[i*3+2]=(Math.random()-.5)*6-1;
+    pVel.push(.08+Math.random()*.25);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  pts = new THREE.Points(g, new THREE.PointsMaterial({
+    color:'#b4f63a', size:.045, transparent:true, opacity:.55,
+    blending:THREE.AdditiveBlending, depthWrite:false }));
+  scene.add(pts);
+}
+
+/* --- luces --- */
+scene.add(new THREE.AmbientLight('#7a6aa0', 1.2));
+const keyL = new THREE.DirectionalLight('#ffffff', 2.2); keyL.position.set(2,3,5); scene.add(keyL);
+const rimM = new THREE.PointLight('#ff3ea5', 30, 20); rimM.position.set(-4,1,2); scene.add(rimM);
+const rimL = new THREE.PointLight('#b4f63a', 25, 20); rimL.position.set(4,-1,3); scene.add(rimL);
+
+/* --- logo GLB --- */
+const logoGroup = new THREE.Group(); scene.add(logoGroup);
+let logoH = 1.9, logoReady = false;
+
+new GLTFLoader().load('logo.glb', gltf=>{
+  const obj = gltf.scene;
+  const box = new THREE.Box3().setFromObject(obj);
+  const c = box.getCenter(new THREE.Vector3());
+  obj.position.sub(c);                       // centrar
+  logoH = box.getSize(new THREE.Vector3()).y;
+  logoGroup.add(obj);
+  logoReady = true;
+}, undefined, err=>{
+  console.warn('logo.glb no encontrado — usando marcador.', err);
+  // fallback: anillo neon
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(.8,.07,24,90),
+    new THREE.MeshStandardMaterial({ color:'#a855f7', emissive:'#a855f7', emissiveIntensity:1.2, metalness:.6, roughness:.25 }));
+  logoGroup.add(ring); logoH = 1.8; logoReady = true;
+});
+
+/* helpers de encuadre */
+const worldPerPx = dist => 2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*dist / innerHeight;
+function splashTransform(){
+  const s = (innerHeight*0.52) * worldPerPx(8) / logoH;   // 52% de la altura
+  return { pos:new THREE.Vector3(0, innerHeight*0.10*worldPerPx(8), 0), scale:s };
+}
+function headerTransform(){
+  const r = document.getElementById('logoAnchor').getBoundingClientRect();
+  const ndc = new THREE.Vector2(((r.left+r.width/2)/innerWidth)*2-1, -(((r.top+r.height/2)/innerHeight)*2-1));
+  const v = new THREE.Vector3(ndc.x, ndc.y, .5).unproject(camera);
+  const dir = v.sub(camera.position).normalize();
+  const t = (0 - camera.position.z)/dir.z;
+  const pos = camera.position.clone().add(dir.multiplyScalar(t));
+  const s = (r.height*1.45) * worldPerPx(8) / logoH;
+  return { pos, scale:s };
+}
+
+/* estado de animación del logo */
+let mode = 'splash';            // splash -> fly -> header
+let fly = null;
+const easeInOut = x => x<.5 ? 4*x*x*x : 1-Math.pow(-2*x+2,3)/2;
+
+function startMenu(){
+  if (mode!=='splash') return;
+  document.getElementById('splash').classList.add('gone');
+  const menu = document.getElementById('menu');
+  menu.classList.add('on');
+  /* entrada escalonada */
+  menu.querySelectorAll('.item').forEach((el,i)=> el.style.transitionDelay = (0.15+i*0.12)+'s');
+  /* vuelo del logo al header */
+  const from = { pos:logoGroup.position.clone(), scale:logoGroup.scale.x };
+  fly = { from, t0: performance.now(), dur: reduced? 1 : 1400 };
+  mode='fly';
+  startGlowCycle();
+}
+
+/* splash: arranca cuando el logo está listo (o timeout) y dura ~4.5 s */
+const splashStart = performance.now();
+const trySchedule = setInterval(()=>{
+  if (logoReady || performance.now()-splashStart>4000){
+    clearInterval(trySchedule);
+    setTimeout(startMenu, reduced ? 300 : 4200);
+  }
+},100);
+/* tecla o toque para saltar / repetir */
+addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' ') startMenu(); if(e.key==='r'||e.key==='R') location.reload(); });
+addEventListener('pointerdown', ()=> mode==='splash' ? startMenu() : null);
+
+/* ciclo de resaltado de productos */
+function startGlowCycle(){
+  if (reduced) return;
+  const rows=[...document.querySelectorAll('.row')]; let i=-1;
+  setInterval(()=>{
+    if(i>=0) rows[i].classList.remove('glow');
+    i=(i+1)%rows.length;
+    rows[i].classList.add('glow');
+  }, 2600);
+}
+
+/* resize */
+function resize(){
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  hazeUniforms.uRes.value.set(innerWidth*renderer.getPixelRatio(), innerHeight*renderer.getPixelRatio());
+}
+addEventListener('resize', resize); resize();
+
+/* loop */
+renderer.setAnimationLoop((tms)=>{
+  const t = tms/1000;
+  hazeUniforms.uTime.value = t;
+
+  if (pts){
+    const a = pts.geometry.attributes.position;
+    for(let i=0;i<PN;i++){
+      let y = a.getY(i) + pVel[i]*0.016;
+      if (y>4.8) y=-4.8;
+      a.setY(i,y);
+      a.setX(i, a.getX(i)+Math.sin(t*.4+i)*.0015);
+    }
+    a.needsUpdate = true;
+  }
+
+  if (logoReady){
+    if (mode==='splash'){
+      const s = splashTransform();
+      logoGroup.position.lerp(s.pos, .12);
+      const k = THREE.MathUtils.lerp(logoGroup.scale.x||s.scale*.6, s.scale, .12);
+      logoGroup.scale.setScalar(k);
+      logoGroup.rotation.y = reduced?0 : Math.sin(t*.6)*.45;
+      logoGroup.position.y = s.pos.y + (reduced?0:Math.sin(t*1.3)*.08*s.scale*logoH*.1);
+    }
+    else if (mode==='fly'){
+      const h = headerTransform();
+      const k = Math.min(1,(performance.now()-fly.t0)/fly.dur), e = easeInOut(k);
+      logoGroup.position.lerpVectors(fly.from.pos, h.pos, e);
+      logoGroup.scale.setScalar(THREE.MathUtils.lerp(fly.from.scale, h.scale, e));
+      logoGroup.rotation.y = (1-e)*Math.sin(t*.6)*.45 + e*Math.sin(t*.5)*.3;
+      if (k>=1) mode='header';
+    }
+    else { // header
+      const h = headerTransform();
+      logoGroup.position.copy(h.pos);
+      logoGroup.scale.setScalar(h.scale);
+      logoGroup.rotation.y = reduced?0:Math.sin(t*.5)*.3;
+    }
+  }
+
+  rimM.intensity = 26 + Math.sin(t*1.7)*8;
+  rimL.intensity = 22 + Math.cos(t*1.3)*7;
+
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
